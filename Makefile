@@ -42,7 +42,15 @@ archive: clean
 	tar --exclude=*.gz -czf $(name)-$(version).tar.gz ../$(name)
 
 deb:
-	checkinstall --nodoc --install=no --arch=all --pkgname=$(name) --pkgversion=$(version) --maintainer=zzarko@gmail.com --requires=python,python-qt4,icoutils,xdg-utils --default
+	checkinstall \
+		--nodoc \
+		--install=no \
+		--arch=all \
+		--pkgname=$(name) \
+		--pkgversion=$(version) \
+		--maintainer=zzarko@gmail.com \
+		--requires=python3,python3-pyqt4,icoutils,xdg-utils \
+		--default
 	${cleanmac}
 
 .PHONY: install, uninstall, clean, archive, deb

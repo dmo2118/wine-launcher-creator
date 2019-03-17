@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 #    Wine Launcher Creator (c) 2011  Žarko Živanov
@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.0.8"
+VERSION="1.1.0"
 
 import sys
 import glob
@@ -60,10 +60,11 @@ def bash(command, workdir=None):
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    shell=True, cwd=workdir)
         output, unused_err = process.communicate()
+        output = output.decode("utf-8")
         code = process.poll()
     except:
         code = 127
-    if len(output) > 0: print("OUTPUT:\n",output)
+    if len(output) > 0: print("OUTPUT:\n",output,sep="")
     print("CODE:",code)
     return code,output
 
@@ -412,11 +413,11 @@ class MainWindow(QMainWindow):
         #first argument is path to exe file
         path = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else ""
         path = urllib.parse.unquote(path)
-        self.executable.edit.setText(path.decode("utf-8"))
+        self.executable.edit.setText(path)
         #second argument is path to main application directory (ico files search path/initial name guess)
-        path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path).encode("utf-8")
+        path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path)
         path = urllib.parse.unquote(path)
-        self.application.edit.setText(path.decode("utf-8"))
+        self.application.edit.setText(path)
 
         #directory for program's configuration file
         self.config = os.path.expanduser("~/.config/wlcreator")
@@ -564,7 +565,7 @@ class MainWindow(QMainWindow):
             self.setStatus("You need to select an icon first.")
             return
         #full path to selected icon
-        iconSource = str(items[0].data(Qt.UserRole).toString())
+        iconSource = str(items[0].data(Qt.UserRole))
         #icon's name
         iconName = os.path.basename(iconSource)
         #full path to destination icon
@@ -592,7 +593,7 @@ class MainWindow(QMainWindow):
         launcherPath = os.path.join(self.launcher.path, self.name.text+".desktop")
         #write launcher's contents
         launcherFile = open(launcherPath, "w")
-        launcherFile.write(launcherText.encode("utf-8"))
+        launcherFile.write(launcherText)
         launcherFile.close()
         #make it executable
         bash("chmod 755 \"" + launcherPath + "\"")
@@ -624,11 +625,11 @@ class MainWindow(QMainWindow):
             cfg = configparser.SafeConfigParser(self.cfgDefaults)
             cfg.read(cfgfile)
             if "WLCreator" in cfg.sections():
-                self.launcher.edit.setText(cfg.get("WLCreator","Launcher").decode("utf-8"))
-                self.icons.edit.setText(cfg.get("WLCreator","Icons").decode("utf-8"))
-                self.wine.edit.setText(cfg.get("WLCreator","Wine").decode("utf-8"))
-                self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix").decode("utf-8"))
-                self.bottles.edit.setText(cfg.get("WLCreator","Bottles").decode("utf-8"))
+                self.launcher.edit.setText(cfg.get("WLCreator","Launcher"))
+                self.icons.edit.setText(cfg.get("WLCreator","Icons"))
+                self.wine.edit.setText(cfg.get("WLCreator","Wine"))
+                self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix"))
+                self.bottles.edit.setText(cfg.get("WLCreator","Bottles"))
                 cfgRead = True
         if not cfgRead:
             self.defaultConfig()
@@ -642,11 +643,11 @@ class MainWindow(QMainWindow):
         cfg = configparser.SafeConfigParser()
         if not cfg.has_section("WLCreator"):
             cfg.add_section("WLCreator")
-        cfg.set("WLCreator","Launcher",self.launcher.path.encode("utf-8"))
-        cfg.set("WLCreator","Icons",self.icons.path.encode("utf-8"))
-        cfg.set("WLCreator","Wine",self.wine.text.encode("utf-8"))
-        cfg.set("WLCreator","WinePrefix",self.prefix.path.encode("utf-8"))
-        cfg.set("WLCreator","Bottles",self.bottles.path.encode("utf-8"))
+        cfg.set("WLCreator","Launcher",self.launcher.path)
+        cfg.set("WLCreator","Icons",self.icons.path)
+        cfg.set("WLCreator","Wine",self.wine.text)
+        cfg.set("WLCreator","WinePrefix",self.prefix.path)
+        cfg.set("WLCreator","Bottles",self.bottles.path)
         cfg.write(cfgfile)
 
     def settingsToggle(self):
@@ -722,6 +723,9 @@ if __name__ == '__main__':
 
 """
 History of changes
+
+Version 1.1.0
+    - Requires Python 3. String fixes here and there.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
