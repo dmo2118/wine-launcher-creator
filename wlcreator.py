@@ -25,8 +25,8 @@ import tempfile
 import subprocess
 import shlex
 import shutil
-import ConfigParser
-import urllib
+import configparser
+import urllib.request, urllib.parse, urllib.error
 
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
@@ -51,7 +51,7 @@ def check_output(*popenargs, **kwargs):
 def bash(command, workdir=None):
     """Helper function to execute bash commands"""
     #command = shlex.split(command.encode("utf-8"))
-    print "COMMAND:",command
+    print("COMMAND:",command)
 #    try:
 #        code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
 #    except:
@@ -63,8 +63,8 @@ def bash(command, workdir=None):
         code = process.poll()
     except:
         code = 127
-    if len(output) > 0: print "OUTPUT:\n",output
-    print "CODE:",code
+    if len(output) > 0: print("OUTPUT:\n",output)
+    print("CODE:",code)
     return code,output
 
 def checkDependencies():
@@ -157,7 +157,7 @@ class BrowseControl(QHBoxLayout):
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         if dialog.exec_() == QDialog.Accepted:
             #if user selected something
-            self.path = unicode(dialog.selectedFiles()[0])
+            self.path = str(dialog.selectedFiles()[0])
             self.pathValid = True
             self.noCallback = True
             self.edit.setText(self.path)
@@ -167,7 +167,7 @@ class BrowseControl(QHBoxLayout):
 
     def edited(self):
         """callback for edit control"""
-        self.path = unicode(self.edit.text())
+        self.path = str(self.edit.text())
         self.pathValid = os.access(self.path, os.F_OK)
         if self.pathValid:
             if self.setStatus != None: self.setStatus()
@@ -201,7 +201,7 @@ class EditControl(QHBoxLayout):
 
     def edited(self):
         """callback for edit control"""
-        self.text = unicode(self.edit.text())
+        self.text = str(self.edit.text())
         if self.callback != None: self.callback()
 
 class DebugDialog(QDialog):
@@ -411,11 +411,11 @@ class MainWindow(QMainWindow):
         self.temporary = tempfile.mkdtemp()
         #first argument is path to exe file
         path = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else ""
-        path = urllib.unquote(path)
+        path = urllib.parse.unquote(path)
         self.executable.edit.setText(path.decode("utf-8"))
         #second argument is path to main application directory (ico files search path/initial name guess)
         path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path).encode("utf-8")
-        path = urllib.unquote(path)
+        path = urllib.parse.unquote(path)
         self.application.edit.setText(path.decode("utf-8"))
 
         #directory for program's configuration file
@@ -564,7 +564,7 @@ class MainWindow(QMainWindow):
             self.setStatus("You need to select an icon first.")
             return
         #full path to selected icon
-        iconSource = unicode(items[0].data(Qt.UserRole).toString())
+        iconSource = str(items[0].data(Qt.UserRole).toString())
         #icon's name
         iconName = os.path.basename(iconSource)
         #full path to destination icon
@@ -621,7 +621,7 @@ class MainWindow(QMainWindow):
         cfgRead = False
         if os.access(cfgfile, os.F_OK):
             #if config exists, load it
-            cfg = ConfigParser.SafeConfigParser(self.cfgDefaults)
+            cfg = configparser.SafeConfigParser(self.cfgDefaults)
             cfg.read(cfgfile)
             if "WLCreator" in cfg.sections():
                 self.launcher.edit.setText(cfg.get("WLCreator","Launcher").decode("utf-8"))
@@ -639,7 +639,7 @@ class MainWindow(QMainWindow):
         if not os.access(self.config, os.F_OK):
             os.makedirs(self.config)
         cfgfile = open(os.path.join(self.config,"settings.ini"),"w")
-        cfg = ConfigParser.SafeConfigParser()
+        cfg = configparser.SafeConfigParser()
         if not cfg.has_section("WLCreator"):
             cfg.add_section("WLCreator")
         cfg.set("WLCreator","Launcher",self.launcher.path.encode("utf-8"))
@@ -687,7 +687,7 @@ class MainWindow(QMainWindow):
 
     def about(self):
         """displays about dialog"""
-        text = u"Wine Launcher Creator v"+VERSION+u" (c) 2011  Žarko Živanov"
+        text = "Wine Launcher Creator v"+VERSION+" (c) 2011  Žarko Živanov"
         text += "<br>E-Mail: zzarko@gmail.com"
         text += "<br><br>University of Novi Sad, Faculty Of Technical Sciences"
         text += "<br>Chair for Applied Computer Science"
