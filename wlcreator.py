@@ -20,18 +20,66 @@ VERSION="1.1.0"
 
 import sys
 import glob
+import re
 import os
 import tempfile
 import subprocess
 import shlex
 import shutil
 import configparser
+import unicodedata
 import urllib.request, urllib.parse, urllib.error
 
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 
 ICON_SIZE = 64
+
+INDEX = 0
+WIDTH = 1
+HEIGHT = 2
+BIT_DEPTH = 3
+
+def getSuffix(file):
+    # Windows file system case comparisons convert both sides to upper case.
+    # TODO: Use binary headers, not extensions
+    return file[-4:].upper()
+
+def iconImages(ico):
+    icons = subprocess.check_output(["icotool", "-l", ico])
+    if icons and icons[-1] == ord("\n"):
+        icons = icons[:-1]
+    return [tuple(int(image[key]) for key in [b"index", b"width", b"height", b"bit-depth"])
+            for image
+            in (dict(re.findall(b"--([^ =]*)(?:=([^ ]*))?", image)) for image in icons.split(b"\n"))]
+
+def iconExtract(ico, image, path):
+    #convert ico file to png files
+
+    # icotool is a bit broken with Windows 7 explorer.exe.
+    subprocess.check_call(
+        [
+            "icotool",
+            "-x",
+            "--icon",
+            "--index",
+            str(image[INDEX]),
+            ico
+        ],
+        cwd = path)
+
+    if getSuffix(ico) == ".ICO":
+        ico = ico[:-4]
+
+    return "{}_{}_{}x{}x{}.png".format(
+        os.path.join(path, os.path.basename(ico)),
+        image[INDEX],
+        image[WIDTH],
+        image[HEIGHT],
+        image[BIT_DEPTH])
+
+def multiIconFile(suffix):
+    return suffix in [".EXE", ".DLL", ".ICL"]
 
 def check_output(*popenargs, **kwargs):
     """This function is copied from python 2.7.1 subprocess.py
@@ -280,8 +328,11 @@ class MainWindow(QMainWindow):
         self.name = EditControl("Name","Launcher's name")
         self.layout1.addLayout(self.name)
 
-        label = QLabel("Select application icon:")
-        self.layout1.addWidget(label)
+        # Not included: the rarely seen *.icl.
+        self.iconPath = BrowseControl("Icon", "browseTitle",
+            "Path to the file containing the icon. Often this is just the executable.", "", self.iconCallback,
+            "All supported icons (*.ico *.ICO *.exe *.EXE *.dll *.DLL *.png *.PNG *.svg *.SVG)")
+        self.layout1.addLayout(self.iconPath)
 
         self.iconWidget = QListWidget()
         self.layout1.addWidget(self.iconWidget)
@@ -373,10 +424,6 @@ class MainWindow(QMainWindow):
             browseDirectory=True, setStatus=self.setStatus)
         self.layout2.addLayout(self.launcher)
 
-        self.icons = BrowseControl("Icons path", "Select icons path", "Path to directory for storing icons",
-            self.cfgDefaults['Icons'], browseDirectory=True, setStatus=self.setStatus)
-        self.layout2.addLayout(self.icons)
-
         self.bottles = BrowseControl("Default Wine prefixes (bottles) path", "Select default wine bottles path",
             "Path to directory for wine prefixes (bottles) creation", self.cfgDefaults['Bottles'],
             browseDirectory=True, setStatus=self.setStatus)
@@ -429,7 +476,6 @@ class MainWindow(QMainWindow):
         self.config = os.path.expanduser("~/.config/wlcreator")
         self.loadConfig()
 
-        self.populateIconList()
         self.resize(QSize(700,600))
         if self.executable.path == "": self.setStatus("Select an exe file.")
 
@@ -453,16 +499,17 @@ class MainWindow(QMainWindow):
 
     def exeCallback(self):
         """callback for executable path"""
-        path = os.path.dirname(self.executable.path)
-        if path != self.application.path:
-            self.application.edit.setText(path)
-        else:
-            self.populateIconList()
+        exePath = self.executable.path
+        path = os.path.dirname(exePath)
+        self.application.edit.setText(path)
+        self.iconPath.edit.setText(exePath)
+
+    def iconCallback(self):
+        self.populateIconList(self.iconPath.path)
 
     def appCallback(self):
         """callback for application path"""
         self.name.edit.setText(os.path.basename(self.application.path))
-        self.populateIconList()
 
     def selectPrefix(self):
         path = os.path.join(self.bottles.path,self.name.text)
@@ -508,76 +555,109 @@ class MainWindow(QMainWindow):
         dialog.debug()
         dialog.exec_()
 
-    def populateIconList(self):
-        """extracts and finds all icons for specified exe and app"""
+    def extractIcoFile(self, ico):
+        images = iconImages(ico)
+
+        # (image[WIDTH] + image[HEIGHT]) * 0.5 would also work. There's no wrong answer; XDG just says "size".
+        # <https://standards.freedesktop.org/icon-theme-spec/latest/ar01s05.html>
+        _, bestWidth, bestHeight, _ = min(images, key = lambda image: abs((image[WIDTH] * image[HEIGHT]) ** 0.5 - ICON_SIZE))
+
+        return iconExtract(
+            ico,
+            max((image for image in images if image[WIDTH] == bestWidth and image[HEIGHT] == bestHeight),
+                key = lambda image: image[BIT_DEPTH]),
+            self.temporary)
+
+    def addIcon(self, png, title):
+        #insert png file in iconWidget
+
+        # QPixmap can (sometimes) load .ico files, but it will just do the first image, not the best image.
+        pixmap = QPixmap(png)
+        icon = QIcon(pixmap)
+        widget = QListWidgetItem(icon,title)
+        widget.setToolTip("Width:"+str(pixmap.width())+"\nHeight:"+str(pixmap.height())+"\nDepth:"+str(pixmap.depth()))
+        self.iconWidget.addItem(widget)
+
+        self.setStatus("Icons extracted/found. Select one.")
+
+    def populateIconList(self, iconPath):
+        """extracts and finds all icons for specified icon file"""
         self.iconWidget.clear()
         self.clearTemporary()
         extractedList = None
-        if self.executable.path != "":
-            #extract icons from all exe files in exe file's directory
-            path = os.path.dirname(self.executable.path)
-            exeList = glob.glob( os.path.join(path, '*.exe') )
-            EXEList = glob.glob( os.path.join(path, '*.EXE') )
-            exeList.extend(EXEList)
-            for exe in exeList:
-                bash("wrestool -x -t 14 -o \"" + self.temporary + "\" \"" + exe + "\"")
-            extractedList = glob.glob( os.path.join(self.temporary, '*.ico') )
-        if self.application.path != "":
-            #copy all found ico files from the application directory (recursive)
-            bash("find \"" + self.application.path + "/\" -iname \"*.ico\" -exec cp '{}' \"" + self.temporary + "\"/ \\;")
-            #copy all found png files from the application directory
-            bash("find \"" + self.application.path + "/\" -maxdepth 1 -iname \"*.png\" -exec cp '{}' \"" + self.temporary + "\"/ \\;")
-            #png files are searched only in selected directory (non-recursive) because many games have a lot of png files
-        #check if there are any icon files
-        if len(os.listdir(self.temporary)) == 0:
-            self.setStatus("Could not extract/find any icons! Try using wrestool manually.")
-            return
 
-        #convert ico files to png files
-        icoList = glob.glob( os.path.join(self.temporary, '*.ico') )
-        for ico in icoList:
-            bash("icotool -x " + "\""+ico+"\"", self.temporary)
+        suffix = getSuffix(iconPath)
+        if multiIconFile(suffix):
+            #extract icons from exe file
+            bash("wrestool -x -t 14 -o \"" + self.temporary + "\" \"" + iconPath + "\"")
+            #check if there are any icon files
+            if len(os.listdir(self.temporary)) == 0:
+                self.setStatus("Could not extract/find any icons! Try using wrestool manually.")
+                return
 
-        #create list of png files
-        pngList = glob.glob( os.path.join(self.temporary, '*.png') )
-        PNGList = glob.glob( os.path.join(self.temporary, '*.PNG') )
-        pngList.extend(PNGList)
-        if len(pngList) == 0:
-            self.setStatus("Could not convert ico(s) to png(s)! Try using icotool manually, or try GIMP.")
-            #copy extracted icons to app directory
-            if len(extractedList) > 0:
-                for f in extractedList: bash("cp \"" + f + "\" \"" + self.application.path + "\"")
-            return
-        #insert png files in iconWidget
-        for png in pngList:
-            pixmap = QPixmap(png)
-            icon = QIcon(pixmap)
-            widget = QListWidgetItem(icon,str(pixmap.width())+"x"+str(pixmap.height())+"x"+str(pixmap.depth()))
-            widget.setData(Qt.UserRole,png)
-            widget.setToolTip("Width:"+str(pixmap.width())+"\nHeight:"+str(pixmap.height())+"\nDepth:"+str(pixmap.depth()))
-            self.iconWidget.addItem(widget)
-        self.setStatus("Icons extracted/found. Select one.")
+            prefixSize = len(os.path.basename(iconPath)) + 4
+
+            icoList = glob.glob(os.path.join(self.temporary, "*.ico"))
+            if not icoList:
+                self.setStatus("Could not convert ico(s) to png(s)! Try using icotool manually, or try GIMP.")
+                return
+
+            for ico in icoList:
+                title = os.path.basename(ico)[prefixSize:][:-4]
+                ico_path = os.path.join(self.temporary, title + ".ico")
+                png_path = os.path.join(self.temporary, title + ".png")
+                os.rename(ico, ico_path)
+                #move all found png files from the application directory
+                os.rename(self.extractIcoFile(ico_path), png_path)
+                self.addIcon(png_path, title)
+        elif suffix == ".ICO":
+            self.addIcon(self.extractIcoFile(iconPath), os.path.basename(iconPath))
+        else:
+            self.addIcon(iconPath, os.path.basename(iconPath))
 
     def createLauncher(self):
         """creates .desktop file"""
         if not self.executable.pathValid: return
         if not self.application.pathValid: return
-        #create icons directory, if it doesn't exist
-        if not os.access(self.icons.path, os.F_OK):
-            os.makedirs(self.icons.path)
-        #get selected icon
-        items = self.iconWidget.selectedItems()
-        if len(items) == 0:
-            self.setStatus("You need to select an icon first.")
-            return
         #full path to selected icon
-        iconSource = str(items[0].data(Qt.UserRole))
-        #icon's name
-        iconName = os.path.basename(iconSource)
-        #full path to destination icon
-        iconDestination = os.path.join(self.icons.path,iconName)
-        #copy icon file
-        shutil.copyfile(iconSource,iconDestination)
+        iconSource = self.iconPath.path
+        suffix = getSuffix(iconSource)
+        if multiIconFile(suffix):
+            #get selected icon
+            items = self.iconWidget.selectedItems()
+            if len(items) == 0:
+                self.setStatus("You need to select an icon first.")
+                return
+            iconSource = os.path.join(self.temporary, items[0].text() + ".ico")
+
+        suffix = getSuffix(iconSource)
+        if suffix == ".ICO":
+            images = iconImages(iconSource)
+            images.sort(key = lambda image: (image[WIDTH], image[HEIGHT], -image[BIT_DEPTH]))
+
+            iconPathBase = os.path.expanduser("~/.local/share/icons/hicolor")
+            iconDestination = "wlcreator-" + "".join(
+                (c.lower() if c.isalnum() and ord(c) < 0x80 or c in ["_", "."] else "-")
+                for c
+                in unicodedata.normalize('NFKD', os.path.basename(self.name.edit.text()))
+                if not unicodedata.combining(c))
+
+            prev = None
+            for image in images:
+                if not prev or image[WIDTH] != prev[WIDTH] or image[HEIGHT] != prev[HEIGHT]:
+                    iconPath = os.path.join(iconPathBase, "{}x{}".format(image[WIDTH], image[HEIGHT]), "apps")
+                    #create icons directory, if it doesn't exist
+                    os.makedirs(iconPath, exist_ok = True)
+                    #move icon file
+                    shutil.move(
+                        iconExtract(iconSource, image, path = self.temporary),
+                        os.path.join(iconPath, iconDestination + ".png"))
+                prev = image
+
+            subprocess.call(["xdg-icon-resource", "forceupdate"])
+        else:
+            iconDestination = iconSource
+
         #directory of exe file
         exeDirectory = os.path.dirname(self.executable.path)
         #generate launcher's contents
@@ -617,7 +697,6 @@ class MainWindow(QMainWindow):
     def defaultConfig(self):
         """creates default configuration options"""
         self.launcher.edit.setText(self.cfgDefaults['Launcher'])
-        self.icons.edit.setText(self.cfgDefaults['Icons'])
         self.wine.edit.setText(self.cfgDefaults['Wine'])
         self.prefix.edit.setText(self.cfgDefaults['WinePrefix'])
         self.bottles.edit.setText(self.cfgDefaults['Bottles'])
@@ -632,7 +711,6 @@ class MainWindow(QMainWindow):
             cfg.read(cfgfile)
             if "WLCreator" in cfg.sections():
                 self.launcher.edit.setText(cfg.get("WLCreator","Launcher"))
-                self.icons.edit.setText(cfg.get("WLCreator","Icons"))
                 self.wine.edit.setText(cfg.get("WLCreator","Wine"))
                 self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix"))
                 self.bottles.edit.setText(cfg.get("WLCreator","Bottles"))
@@ -650,7 +728,6 @@ class MainWindow(QMainWindow):
         if not cfg.has_section("WLCreator"):
             cfg.add_section("WLCreator")
         cfg.set("WLCreator","Launcher",self.launcher.path)
-        cfg.set("WLCreator","Icons",self.icons.path)
         cfg.set("WLCreator","Wine",self.wine.text)
         cfg.set("WLCreator","WinePrefix",self.prefix.path)
         cfg.set("WLCreator","Bottles",self.bottles.path)
@@ -734,6 +811,12 @@ Version 1.1.0
     - Requires Python 3. String fixes here and there.
     - More descriptive temp directory name.
     - Icon size in view reduced to 64x64.
+    - Replaced recursive search for icons with a single source file for icons + a browse button.
+    - View only shows one image from Windows icons.
+    - Windows icons are split up by size and placed in ~/.local/share/icons/hicolor/WxH.
+    - PNG and SVG icons are left in their original location.
+    - Icon images are never placed in the app directory.
+    - xdg-icon-resource forceupdate
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)

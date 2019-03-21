@@ -24,7 +24,6 @@ available:
       icon search)
     * Path for launcher creation (default is ~/Desktop/)
       (a copy of launcher is also created in ~/.local/share/applications/wlcreator/)
-    * Path for icon (default is ~/.local/share/icons/wlcreator/)
     * Wine command for launching (default is wine)
     * Path for wine configuration directory (default is ~/.wine)
 
