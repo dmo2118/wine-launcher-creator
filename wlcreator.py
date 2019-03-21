@@ -409,7 +409,7 @@ class MainWindow(QMainWindow):
         self.connect(button, SIGNAL("clicked()"), self.defaultConfig)
 
         #temorary directory for icon extraction
-        self.temporary = tempfile.mkdtemp()
+        self.temporary = tempfile.mkdtemp(prefix = 'wlcreator-')
         #first argument is path to exe file
         path = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else ""
         path = urllib.parse.unquote(path)
@@ -726,6 +726,7 @@ History of changes
 
 Version 1.1.0
     - Requires Python 3. String fixes here and there.
+    - More descriptive temp directory name.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
