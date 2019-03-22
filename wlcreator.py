@@ -661,11 +661,12 @@ class MainWindow(QMainWindow):
         #directory of exe file
         exeDirectory = os.path.dirname(self.executable.path)
         #generate launcher's contents
-        launcherText = "#!/usr/bin/env xdg-open\n"
+        launcherText = "#!/usr/bin/env xdg-open\n\n"
         launcherText += "[Desktop Entry]\n"
-        launcherText += "Version=1.0\n"
         launcherText += "Type=Application\n"
-        launcherText += "Terminal=false\n"
+        launcherText += "Version=1.0\n"
+        launcherText += "Name=" + self.name.text + "\n"
+        launcherText += "Icon=" + iconDestination + "\n"
         s1 = "  ; xrandr -s 0" if self.resolutionFix.isChecked() else ""
         s2 = "gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; "  if self.legacyFS.isChecked() else ""
         s3 = " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"  if self.legacyFS.isChecked() else ""
@@ -673,8 +674,6 @@ class MainWindow(QMainWindow):
         launcherText += "Exec=sh -c \"" + s2 + "env WINEPREFIX=\'" + self.prefix.path + "\' " + \
                         self.wine.text + " \'" + self.executable.path + "\'" + s4 + s1 + s3 + "\"\n"
         launcherText += "Path=" + exeDirectory + "\n"
-        launcherText += "Name=" + self.name.text + "\n"
-        launcherText += "Icon=" + iconDestination + "\n"
         #full path to launcher
         launcherPath = os.path.join(self.launcher.path, self.name.text+".desktop")
         #write launcher's contents
@@ -818,6 +817,7 @@ Version 1.1.0
     - Icon images are never placed in the app directory.
     - xdg-icon-resource forceupdate
     - Added newline to end of .desktop.
+    - Desktop entry keys are in the same order as the standard.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
