@@ -81,6 +81,26 @@ def iconExtract(ico, image, path):
 def multiIconFile(suffix):
     return suffix in [".EXE", ".DLL", ".ICL"]
 
+def defaultWinePrefix():
+    return os.path.expanduser("~/.wine")
+
+def escape(text, allowSingleQuote):
+    hasSQIllegal = False
+    hasReserved = False
+    for c in text:
+        if c in "'\t\n":
+            hasSQIllegal = True
+        elif c in '"\\ ><~|&;$*?#()`=':
+            hasReserved = True
+
+    if allowSingleQuote and not hasSQIllegal and hasReserved:
+        return "'" + text + "'"
+
+    if hasSQIllegal or hasReserved:
+        return '"' + re.sub('(["`$\\\\\t\n])', r'\\\1', text).translate(str.maketrans({'\n': 'n', '\t': 't'})) + '"'
+
+    return text
+
 def check_output(*popenargs, **kwargs):
     """This function is copied from python 2.7.1 subprocess.py
        Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
@@ -291,7 +311,7 @@ class MainWindow(QMainWindow):
         self.cfgDefaults = {'Launcher': self.desktopPath,
                             'Icons': os.path.expanduser("~/.local/share/icons/wlcreator"),
                             'Wine': "wine",
-                            'WinePrefix': os.path.expanduser("~/.wine"),
+                            'WinePrefix': defaultWinePrefix(),
                             'Bottles': os.path.expanduser("~/")}
 
         self.setWindowTitle("Wine Launcher Creator")
@@ -542,14 +562,37 @@ class MainWindow(QMainWindow):
         else:
             self.setStatus("Prefix \'"+self.prefix.path+"\' not populated. Run WineCfg first.")
 
+    def commandLine(self):
+        exeDirectory = os.path.dirname(self.executable.path)
+        prefix = suffix = ""
+
+        if self.resolutionFix.isChecked():
+            suffix += " ; xrandr -s 0"
+
+        if self.legacyFS.isChecked():
+            prefix = ("gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; " +
+                prefix)
+            suffix += " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"
+
+        needsSh = prefix or suffix
+
+        exe = self.executable.path
+        if len(exe) > len(exeDirectory) and exe[:len(exeDirectory)] == exeDirectory and exe[len(exeDirectory)] == os.path.sep:
+            exe = exe[len(exeDirectory) + 1:]
+        exe = self.wine.text + " " + escape(exe, needsSh)
+        if defaultWinePrefix() != self.prefix.path:
+            exe = "env " + escape("WINEPREFIX=" + self.prefix.path, needsSh) + " " + exe
+        if self.appParams.text != "":
+            exe += " " + self.appParams.text
+
+        if needsSh:
+            return "sh -c " + escape(prefix + exe + suffix, False)
+        else:
+            return exe
+
     def debugLauncher(self):
         exeDirectory = os.path.dirname(self.executable.path)
-        s1 = "  ; xrandr -s 0" if self.resolutionFix.isChecked() else ""
-        s2 = "gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; "  if self.legacyFS.isChecked() else ""
-        s3 = " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"  if self.legacyFS.isChecked() else ""
-        s4 = " " + self.appParams.text if self.appParams.text != "" else ""
-        command = s2 + "cd \"" + exeDirectory + "\"; env WINEPREFIX=\"" + self.prefix.path + \
-                  "\" " + self.wine.text + " \"" + self.executable.path + "\"" + s4 + s1 + s3
+        command = "cd " + escape(exeDirectory, True) + "; " + self.commandLine()
         dialog = DebugDialog(self.name.text, command)
         dialog.setModal(True)
         dialog.debug()
@@ -667,12 +710,7 @@ class MainWindow(QMainWindow):
         launcherText += "Version=1.0\n"
         launcherText += "Name=" + self.name.text + "\n"
         launcherText += "Icon=" + iconDestination + "\n"
-        s1 = "  ; xrandr -s 0" if self.resolutionFix.isChecked() else ""
-        s2 = "gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; "  if self.legacyFS.isChecked() else ""
-        s3 = " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"  if self.legacyFS.isChecked() else ""
-        s4 = " " + self.appParams.text if self.appParams.text != "" else ""
-        launcherText += "Exec=sh -c \"" + s2 + "env WINEPREFIX=\'" + self.prefix.path + "\' " + \
-                        self.wine.text + " \'" + self.executable.path + "\'" + s4 + s1 + s3 + "\"\n"
+        launcherText += "Exec=" + self.commandLine() + "\n"
         launcherText += "Path=" + exeDirectory + "\n"
         #full path to launcher
         launcherPath = os.path.join(self.launcher.path, self.name.text+".desktop")
@@ -818,6 +856,7 @@ Version 1.1.0
     - xdg-icon-resource forceupdate
     - Added newline to end of .desktop.
     - Desktop entry keys are in the same order as the standard.
+    - Simplified command line in .desktop.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
