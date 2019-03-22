@@ -31,6 +31,8 @@ import urllib.request, urllib.parse, urllib.error
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 
+ICON_SIZE = 64
+
 def check_output(*popenargs, **kwargs):
     """This function is copied from python 2.7.1 subprocess.py
        Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
@@ -286,7 +288,11 @@ class MainWindow(QMainWindow):
         self.iconWidget.setViewMode(QListView.IconMode)
         self.iconWidget.setMovement(QListView.Static)
         self.iconWidget.setResizeMode(QListView.Adjust)
-        self.iconWidget.setIconSize(QSize(256,256))
+
+        # Desktop icon size, more-or-less, judging by Kubuntu and Debian screenshots.
+        # https://cgit.kde.org/kiconthemes.git/tree/src/kicontheme.cpp hints that it's normally 32, but that seems wrong.
+        # QApplication.style().pixelMetric(QStyle.PM_MessageBoxIconSize) is another option.
+        self.iconWidget.setIconSize(QSize(ICON_SIZE,ICON_SIZE))
         
         self.prefix = BrowseControl("Wine prefix path", "Select Wine prefix path", 
             "Path to directory containing Wine prefix (bottle)", self.cfgDefaults['WinePrefix'],
@@ -727,6 +733,7 @@ History of changes
 Version 1.1.0
     - Requires Python 3. String fixes here and there.
     - More descriptive temp directory name.
+    - Icon size in view reduced to 64x64.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
