@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 #    Wine Launcher Creator (c) 2011  Žarko Živanov
+#                          (c) 2019  David Odell <dmo2118@gmail.com>
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -856,13 +857,15 @@ class MainWindow(QMainWindow):
 
     def about(self):
         """displays about dialog"""
-        text = "Wine Launcher Creator v"+VERSION+" (c) 2011  Žarko Živanov"
-        text += "<br>E-Mail: zzarko@gmail.com"
-        text += "<br><br>University of Novi Sad, Faculty Of Technical Sciences"
-        text += "<br>Chair for Applied Computer Science"
-        text += ', <a href="http://www.acs.uns.ac.rs/">http://www.acs.uns.ac.rs</a>'
-        text += "<br><br>Linux User Group of Novi Sad"
-        text += ', <a href="http://www.lugons.org/">http://www.lugons.org/</a>'
+        text = 'Wine Launcher Creator v' + VERSION + '<br><br>'
+        text += '(c) 2011 Žarko Živanov &lt;<a href="mailto:zzarko@gmail.com">zzarko@gmail.com</a>&gt;<br>'
+        text += 'University of Novi Sad, Faculty Of Technical Sciences<br>'
+        text += 'Chair for Applied Computer Science'
+        text += ', <a href="http://www.acs.uns.ac.rs/">http://www.acs.uns.ac.rs</a><br>'
+        text += 'Linux User Group of Novi Sad'
+        text += ', <a href="http://www.lugons.org/">http://www.lugons.org/</a><br>'
+        text += '<br>'
+        text += '(c) 2019 David Odell &lt;<a href="mailto:dmo2118@gmail.com">dmo2118@gmail.com</a>&gt;<br>'
 
         gpl = "<br><br>This program is free software: you can redistribute it and/or modify"
         gpl += "it under the terms of the GNU General Public License as published by"

@@ -48,7 +48,7 @@ deb:
 		--arch=all \
 		--pkgname=$(name) \
 		--pkgversion=$(version) \
-		--maintainer=zzarko@gmail.com \
+		--maintainer=dmo2118@gmail.com \
 		--requires=python3,python3-pyqt4,icoutils,xdg-utils \
 		--default
 	${cleanmac}
