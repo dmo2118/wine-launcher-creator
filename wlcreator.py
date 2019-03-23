@@ -312,7 +312,8 @@ class MainWindow(QMainWindow):
                             'Icons': os.path.expanduser("~/.local/share/icons/wlcreator"),
                             'Wine': "wine",
                             'WinePrefix': defaultWinePrefix(),
-                            'Bottles': os.path.expanduser("~/")}
+                            'Bottles': os.path.expanduser("~/"),
+                            'ExecutableIcon': '1'}
 
         self.setWindowTitle("Wine Launcher Creator")
         self.setWindowIcon(QIcon.fromTheme('wine'))
@@ -451,6 +452,10 @@ class MainWindow(QMainWindow):
 
         self.wine = EditControl("Wine command", "Command used to run Windows applications")
         self.layout2.addLayout(self.wine)
+
+        self.executableIcon = QCheckBox("Make .desktop executable")
+        self.executableIcon.setChecked(int(self.cfgDefaults['ExecutableIcon']))
+        self.layout2.addWidget(self.executableIcon)
 
         button = QPushButton("Install Wine Launcher Creator as Gnome 2 Nautilus Action")
         self.layout2.addWidget(button)
@@ -658,6 +663,13 @@ class MainWindow(QMainWindow):
         else:
             self.addIcon(iconPath, os.path.basename(iconPath))
 
+    def writeLauncher(self, path, text, umask):
+        #write launcher's contents
+        with open(path, "w") as launcherFile:
+            launcherFile.write(text)
+        mode = 0o777 if self.executableIcon.isChecked() else 0o666
+        os.chmod(path, mode & ~umask)
+
     def createLauncher(self):
         """creates .desktop file"""
         if not self.executable.pathValid: return
@@ -704,7 +716,9 @@ class MainWindow(QMainWindow):
         #directory of exe file
         exeDirectory = os.path.dirname(self.executable.path)
         #generate launcher's contents
-        launcherText = "#!/usr/bin/env xdg-open\n\n"
+        launcherText = ""
+        if self.executableIcon.isChecked():
+            launcherText += "#!/usr/bin/env xdg-open\n\n"
         launcherText += "[Desktop Entry]\n"
         launcherText += "Type=Application\n"
         launcherText += "Version=1.0\n"
@@ -714,19 +728,15 @@ class MainWindow(QMainWindow):
         launcherText += "Path=" + exeDirectory + "\n"
         #full path to launcher
         launcherPath = os.path.join(self.launcher.path, self.name.text+".desktop")
-        #write launcher's contents
-        launcherFile = open(launcherPath, "w")
-        launcherFile.write(launcherText)
-        launcherFile.close()
-        #make it executable
-        bash("chmod 755 \"" + launcherPath + "\"")
+        umask = os.umask(0)
+        os.umask(umask)
+        self.writeLauncher(launcherPath, launcherText, umask)
         launcherLocalAppPath = os.path.expanduser("~/.local/share/applications/wlcreator/")
         if not os.access(launcherLocalAppPath, os.F_OK):
             os.makedirs(launcherLocalAppPath)
         launcherLocalAppPath = os.path.join(launcherLocalAppPath, self.name.text+".desktop")
         if launcherPath != launcherLocalAppPath:
-            shutil.copyfile(launcherPath,launcherLocalAppPath)
-            bash("chmod 755 \"" + launcherLocalAppPath + "\"")
+            self.writeLauncher(launcherLocalAppPath, launcherText, umask)
             self.setStatus("Launcher created in "+self.launcher.path+". A copy is also in ~/.local/share/applications/wlcreator/")
         else:
             self.setStatus("Launcher created in "+self.launcher.path)
@@ -737,6 +747,7 @@ class MainWindow(QMainWindow):
         self.wine.edit.setText(self.cfgDefaults['Wine'])
         self.prefix.edit.setText(self.cfgDefaults['WinePrefix'])
         self.bottles.edit.setText(self.cfgDefaults['Bottles'])
+        self.executableIcon.setChecked(int(self.cfgDefaults['ExecutableIcon']))
 
     def loadConfig(self):
         """load configuration options"""
@@ -751,6 +762,7 @@ class MainWindow(QMainWindow):
                 self.wine.edit.setText(cfg.get("WLCreator","Wine"))
                 self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix"))
                 self.bottles.edit.setText(cfg.get("WLCreator","Bottles"))
+                self.executableIcon.setChecked(int(cfg.get("WLCreator","ExecutableIcon")))
                 cfgRead = True
         if not cfgRead:
             self.defaultConfig()
@@ -768,6 +780,7 @@ class MainWindow(QMainWindow):
         cfg.set("WLCreator","Wine",self.wine.text)
         cfg.set("WLCreator","WinePrefix",self.prefix.path)
         cfg.set("WLCreator","Bottles",self.bottles.path)
+        cfg.set("WLCreator","ExecutableIcon",str(int(self.executableIcon.isChecked())))
         cfg.write(cfgfile)
 
     def settingsToggle(self):
@@ -857,6 +870,7 @@ Version 1.1.0
     - Added newline to end of .desktop.
     - Desktop entry keys are in the same order as the standard.
     - Simplified command line in .desktop.
+    - Added option to make icon executable.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
