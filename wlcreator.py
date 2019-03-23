@@ -349,17 +349,46 @@ class MainWindow(QMainWindow):
         self.name = EditControl("Name","Launcher's name")
         self.layout1.addLayout(self.name)
 
+        layoutBig = QGridLayout()
+        layoutBig.setColumnStretch(0, 1)
+        layoutBig.setColumnStretch(1, 0)
+        self.layout1.addLayout(layoutBig)
+
         # Not included: the rarely seen *.icl.
         self.iconPath = BrowseControl("Icon", "browseTitle",
             "Path to the file containing the icon. Often this is just the executable.", "", self.iconCallback,
             "All supported icons (*.ico *.ICO *.exe *.EXE *.dll *.DLL *.png *.PNG *.svg *.SVG)")
-        self.layout1.addLayout(self.iconPath)
+        layoutBig.addLayout(self.iconPath, 0, 0)
 
+        # TODO: Add pretty icons and locale-accurate descriptions here.
         self.iconWidget = QListWidget()
-        self.layout1.addWidget(self.iconWidget)
+        layoutBig.addWidget(self.iconWidget, 1, 0)
         self.iconWidget.setViewMode(QListView.IconMode)
         self.iconWidget.setMovement(QListView.Static)
         self.iconWidget.setResizeMode(QListView.Adjust)
+
+        layoutBig.addWidget(QLabel("Categories:"), 0, 1)
+        self.categories = QListWidget()
+        layoutBig.addWidget(self.categories, 1, 1)
+
+        for cat in [
+            'AudioVideo',
+            'Audio',
+            'Video',
+            'Development',
+            'Education',
+            'Game',
+            'Graphics',
+            'Network',
+            'Office',
+            'Science',
+            'Settings',
+            'System',
+            'Utility']:
+            item = QListWidgetItem(cat)
+            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            item.setCheckState(Qt.Unchecked)
+            self.categories.addItem(item)
 
         # Desktop icon size, more-or-less, judging by Kubuntu and Debian screenshots.
         # https://cgit.kde.org/kiconthemes.git/tree/src/kicontheme.cpp hints that it's normally 32, but that seems wrong.
@@ -726,6 +755,12 @@ class MainWindow(QMainWindow):
         launcherText += "Icon=" + iconDestination + "\n"
         launcherText += "Exec=" + self.commandLine() + "\n"
         launcherText += "Path=" + exeDirectory + "\n"
+        categories = [item.text()
+                      for item
+                      in (self.categories.item(i) for i in range(self.categories.count()))
+                      if item.checkState()]
+        if categories:
+            launcherText += "Categories=" + ';'.join(categories) + "\n"
         #full path to launcher
         launcherPath = os.path.join(self.launcher.path, self.name.text+".desktop")
         umask = os.umask(0)
@@ -871,6 +906,7 @@ Version 1.1.0
     - Desktop entry keys are in the same order as the standard.
     - Simplified command line in .desktop.
     - Added option to make icon executable.
+    - Added categories.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
