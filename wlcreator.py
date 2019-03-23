@@ -654,7 +654,9 @@ class MainWindow(QMainWindow):
         icon = QIcon(pixmap)
         widget = QListWidgetItem(icon,title)
         widget.setToolTip("Width:"+str(pixmap.width())+"\nHeight:"+str(pixmap.height())+"\nDepth:"+str(pixmap.depth()))
+        firstItem = not self.iconWidget.count()
         self.iconWidget.addItem(widget)
+        widget.setSelected(firstItem)
 
         self.setStatus("Icons extracted/found. Select one.")
 
@@ -910,6 +912,7 @@ Version 1.1.0
     - Simplified command line in .desktop.
     - Added option to make icon executable.
     - Added categories.
+    - Auto-select the first icon.
 
 Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
