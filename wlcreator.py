@@ -17,7 +17,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 
 import sys
 import glob
@@ -702,21 +702,7 @@ class MainWindow(QMainWindow):
         mode = 0o777 if self.executableIcon.isChecked() else 0o666
         os.chmod(path, mode & ~umask)
 
-    def createLauncher(self):
-        """creates .desktop file"""
-        if not self.executable.pathValid: return
-        if not self.application.pathValid: return
-        #full path to selected icon
-        iconSource = self.iconPath.path
-        suffix = getSuffix(iconSource)
-        if multiIconFile(suffix):
-            #get selected icon
-            items = self.iconWidget.selectedItems()
-            if len(items) == 0:
-                self.setStatus("You need to select an icon first.")
-                return
-            iconSource = os.path.join(self.temporary, items[0].text() + ".ico")
-
+    def getIconDestination(self, iconSource):
         suffix = getSuffix(iconSource)
         if suffix == ".ICO":
             images = iconImages(iconSource)
@@ -745,6 +731,24 @@ class MainWindow(QMainWindow):
         else:
             iconDestination = iconSource
 
+        return iconDestination
+
+    def createLauncher(self):
+        """creates .desktop file"""
+        if not self.executable.pathValid: return
+        if not self.application.pathValid: return
+        #full path to selected icon
+        iconSource = self.iconPath.path
+        iconDestination = None
+        suffix = getSuffix(iconSource)
+        if multiIconFile(suffix):
+            #get selected icon
+            items = self.iconWidget.selectedItems()
+            if len(items) != 0:
+                iconDestination = self.getIconDestination(os.path.join(self.temporary, items[0].text() + ".ico"))
+        else:
+            iconDestination = self.getIconDestination(iconSource)
+
         #directory of exe file
         exeDirectory = os.path.dirname(self.executable.path)
         #generate launcher's contents
@@ -755,7 +759,8 @@ class MainWindow(QMainWindow):
         launcherText += "Type=Application\n"
         launcherText += "Version=1.0\n"
         launcherText += "Name=" + self.name.text + "\n"
-        launcherText += "Icon=" + iconDestination + "\n"
+        if iconDestination:
+            launcherText += "Icon=" + iconDestination + "\n"
         launcherText += "Exec=" + self.commandLine() + "\n"
         launcherText += "Path=" + exeDirectory + "\n"
         categories = [item.text()
@@ -896,6 +901,9 @@ if __name__ == '__main__':
 
 """
 History of changes
+
+Version 1.1.1
+    - The icon can be skipped.
 
 Version 1.1.0
     - Requires Python 3. String fixes here and there.
